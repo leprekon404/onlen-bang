@@ -9,7 +9,8 @@ window.analyticsData = {
     categories: [],
     trend: [],
     budgets: [],
-    goals: []
+    goals: [],
+    transactions: []
 };
 
 // Проверка аутентификации
@@ -36,6 +37,7 @@ async function loadAnalytics() {
             loadSummary(),
             loadCategories(),
             loadTrend(),
+            loadTransactions(),
             loadBudgets(),
             loadGoals(),
             loadCategoryOptions()
@@ -98,6 +100,75 @@ async function loadCategories() {
             </div>
         </div>
     `).join('');
+}
+
+// Транзакции
+async function loadTransactions(limit = 10) {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/transactions/history`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    
+    if (!response.ok) return;
+    
+    const data = await response.json();
+    window.analyticsData.transactions = data.transactions || [];
+    
+    const container = document.getElementById('transactionsList');
+    const transactions = data.transactions.slice(0, limit);
+    
+    if (transactions.length === 0) {
+        container.innerHTML = '<div class="empty-state">Операций пока нет</div>';
+        return;
+    }
+    
+    container.innerHTML = transactions.map(tx => {
+        // Определяем тип транзакции
+        const isIncome = tx.from_account_id === null;
+        const isExpense = tx.to_account_id === null;
+        const isTransfer = !isIncome && !isExpense;
+        
+        let amountClass = 'transaction-amount';
+        let sign = '';
+        
+        if (isIncome) {
+            amountClass = 'transaction-amount income';
+            sign = '+';
+        } else if (isExpense) {
+            amountClass = 'transaction-amount expense';
+            sign = '-';
+        } else {
+            amountClass = 'transaction-amount transfer';
+        }
+        
+        const title = tx.description || 
+                     (tx.transaction_type === 'transfer' ? 'Перевод' : 
+                      tx.transaction_type === 'self-transfer' ? 'Перевод между своими' : 
+                      tx.transaction_type);
+        
+        const date = new Date(tx.created_at).toLocaleString('ru-RU', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
+        return `
+            <div class="transaction-item">
+                <div class="transaction-info">
+                    <div class="transaction-title">${title}</div>
+                    <div class="transaction-date">${date}</div>
+                </div>
+                <div class="${amountClass}">${sign}${formatMoney(tx.amount)} ₽</div>
+            </div>
+        `;
+    }).join('');
+}
+
+function showAllTransactions() {
+    loadTransactions(100);
+    document.querySelector('.transactions-section')?.scrollIntoView({ behavior: 'smooth' });
 }
 
 // Тренд
