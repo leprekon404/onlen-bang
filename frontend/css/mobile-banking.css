@@ -310,6 +310,65 @@ body {
 }
 
 /* ==============================================
+   ОПЕРАЦИИ / ТРАНЗАКЦИИ
+============================================== */
+
+.transactions-section {
+    margin-bottom: 32px;
+}
+
+.transactions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.transaction-item {
+    background: white;
+    padding: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 12px;
+    margin-bottom: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.transaction-info {
+    flex: 1;
+}
+
+.transaction-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1a202c;
+    margin-bottom: 4px;
+}
+
+.transaction-date {
+    font-size: 13px;
+    color: #718096;
+}
+
+.transaction-amount {
+    font-size: 16px;
+    font-weight: 600;
+    text-align: right;
+}
+
+.transaction-amount.income {
+    color: #48bb78;
+}
+
+.transaction-amount.expense {
+    color: #f56565;
+}
+
+.transaction-amount.transfer {
+    color: #718096;
+}
+
+/* ==============================================
    БЮДЖЕТЫ И ЦЕЛИ
 ============================================== */
 
@@ -588,6 +647,6 @@ body {
     }
 }
 
-.category-card, .budget-card, .goal-card {
+.category-card, .budget-card, .goal-card, .transaction-item {
     animation: fadeIn 0.3s ease;
 }
