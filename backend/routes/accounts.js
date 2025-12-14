@@ -47,6 +47,46 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 /**
+ * GET /api/accounts/user/summary
+ * Получить сводку по всем счетам (общий баланс, количество счетов)
+ * ВАЖНО: Этот маршрут должен быть ДО /:accountId
+ */
+router.get('/user/summary', authenticateToken, async (req, res) => {
+  const userId = req.user.userId;
+  
+  try {
+    const [summary] = await db.query(
+      `SELECT 
+        COUNT(*) as total_accounts,
+        COUNT(CASE WHEN is_active = TRUE THEN 1 END) as active_accounts,
+        COUNT(CASE WHEN is_frozen = TRUE THEN 1 END) as frozen_accounts,
+        SUM(CASE WHEN is_active = TRUE THEN balance ELSE 0 END) as total_balance,
+        GROUP_CONCAT(DISTINCT currency) as currencies
+      FROM accounts 
+      WHERE user_id = ?`,
+      [userId]
+    );
+    
+    res.json({
+      success: true,
+      summary: {
+        totalAccounts: summary[0].total_accounts,
+        activeAccounts: summary[0].active_accounts,
+        frozenAccounts: summary[0].frozen_accounts,
+        totalBalance: parseFloat(summary[0].total_balance || 0),
+        currencies: summary[0].currencies ? summary[0].currencies.split(',') : []
+      }
+    });
+  } catch (error) {
+    console.error('Ошибка получения сводки:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка при получении сводки по счетам'
+    });
+  }
+});
+
+/**
  * GET /api/accounts/:accountId
  * Получить информацию о конкретном счете
  */
@@ -483,45 +523,6 @@ router.delete('/:accountId', authenticateToken, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Ошибка при закрытии счета'
-    });
-  }
-});
-
-/**
- * GET /api/accounts/summary
- * Получить сводку по всем счетам (общий баланс, количество счетов)
- */
-router.get('/user/summary', authenticateToken, async (req, res) => {
-  const userId = req.user.userId;
-  
-  try {
-    const [summary] = await db.query(
-      `SELECT 
-        COUNT(*) as total_accounts,
-        COUNT(CASE WHEN is_active = TRUE THEN 1 END) as active_accounts,
-        COUNT(CASE WHEN is_frozen = TRUE THEN 1 END) as frozen_accounts,
-        SUM(CASE WHEN is_active = TRUE THEN balance ELSE 0 END) as total_balance,
-        GROUP_CONCAT(DISTINCT currency) as currencies
-      FROM accounts 
-      WHERE user_id = ?`,
-      [userId]
-    );
-    
-    res.json({
-      success: true,
-      summary: {
-        totalAccounts: summary[0].total_accounts,
-        activeAccounts: summary[0].active_accounts,
-        frozenAccounts: summary[0].frozen_accounts,
-        totalBalance: parseFloat(summary[0].total_balance || 0),
-        currencies: summary[0].currencies ? summary[0].currencies.split(',') : []
-      }
-    });
-  } catch (error) {
-    console.error('Ошибка получения сводки:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Ошибка при получении сводки по счетам'
     });
   }
 });
