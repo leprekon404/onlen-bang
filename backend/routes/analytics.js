@@ -13,11 +13,10 @@ const authenticateToken = require('../middleware/auth');
  */
 router.get('/summary', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
-  const period = req.query.period || 'month'; // day, week, month, year, all
+  const period = req.query.period || 'month';
   
   try {
     let dateCondition = '';
-    const now = new Date();
     
     switch (period) {
       case 'day':
@@ -36,28 +35,61 @@ router.get('/summary', authenticateToken, async (req, res) => {
         dateCondition = '';
     }
     
-    // Получаем доходы и расходы
-    const [summary] = await db.query(
-      `SELECT 
-         SUM(CASE WHEN t.to_account_id IN (SELECT account_id FROM accounts WHERE user_id = ?) 
-                  THEN t.amount ELSE 0 END) as total_income,
-         SUM(CASE WHEN t.from_account_id IN (SELECT account_id FROM accounts WHERE user_id = ?) 
-                  THEN t.amount ELSE 0 END) as total_expense,
-         COUNT(DISTINCT t.transaction_id) as total_transactions,
-         AVG(CASE WHEN t.from_account_id IN (SELECT account_id FROM accounts WHERE user_id = ?) 
-                  THEN t.amount ELSE NULL END) as avg_expense
-       FROM transactions t
-       WHERE (t.from_account_id IN (SELECT account_id FROM accounts WHERE user_id = ?)
-              OR t.to_account_id IN (SELECT account_id FROM accounts WHERE user_id = ?))
-       AND t.status = 'completed'
-       ${dateCondition}`,
-      [userId, userId, userId, userId, userId]
-    );
-    
     // Получаем текущий баланс по всем счетам
     const [balance] = await db.query(
       'SELECT SUM(balance) as total_balance FROM accounts WHERE user_id = ? AND is_active = TRUE',
       [userId]
+    );
+    
+    // Получаем ID всех счетов пользователя
+    const [userAccounts] = await db.query(
+      'SELECT account_id FROM accounts WHERE user_id = ?',
+      [userId]
+    );
+    const accountIds = userAccounts.map(a => a.account_id);
+    
+    if (accountIds.length === 0) {
+      return res.json({
+        success: true,
+        period: period,
+        summary: {
+          totalBalance: 0,
+          totalIncome: 0,
+          totalExpense: 0,
+          netSavings: 0,
+          savingsRate: 0,
+          totalTransactions: 0,
+          avgExpense: 0
+        }
+      });
+    }
+    
+    // Рассчитываем доходы и расходы
+    // Доходы - транзакции, где to_account - счет пользователя, а from_account - не его
+    // Расходы - транзакции, где from_account - счет пользователя, а to_account - не его
+    const [summary] = await db.query(
+      `SELECT 
+         SUM(CASE 
+           WHEN t.to_account_id IN (?) AND 
+                (t.from_account_id IS NULL OR t.from_account_id NOT IN (?))
+           THEN t.amount 
+           ELSE 0 
+         END) as total_income,
+         SUM(CASE 
+           WHEN t.from_account_id IN (?) AND 
+                (t.to_account_id IS NULL OR t.to_account_id NOT IN (?))
+           THEN t.amount 
+           ELSE 0 
+         END) as total_expense,
+         COUNT(DISTINCT CASE 
+           WHEN (t.from_account_id IN (?) OR t.to_account_id IN (?))
+           THEN t.transaction_id 
+           ELSE NULL 
+         END) as total_transactions
+       FROM transactions t
+       WHERE t.status = 'completed'
+       ${dateCondition}`,
+      [accountIds, accountIds, accountIds, accountIds, accountIds, accountIds]
     );
     
     const totalIncome = parseFloat(summary[0].total_income || 0);
@@ -73,8 +105,8 @@ router.get('/summary', authenticateToken, async (req, res) => {
         totalExpense: totalExpense,
         netSavings: netSavings,
         savingsRate: totalIncome > 0 ? ((netSavings / totalIncome) * 100).toFixed(2) : 0,
-        totalTransactions: summary[0].total_transactions,
-        avgExpense: parseFloat(summary[0].avg_expense || 0)
+        totalTransactions: summary[0].total_transactions || 0,
+        avgExpense: totalExpense > 0 ? (totalExpense / (summary[0].total_transactions || 1)).toFixed(2) : 0
       }
     });
   } catch (error) {
@@ -98,6 +130,9 @@ router.get('/spending-by-category', authenticateToken, async (req, res) => {
     let dateCondition = '';
     
     switch (period) {
+      case 'day':
+        dateCondition = "AND DATE(t.created_at) = CURDATE()";
+        break;
       case 'week':
         dateCondition = "AND YEARWEEK(t.created_at, 1) = YEARWEEK(CURDATE(), 1)";
         break;
@@ -109,6 +144,22 @@ router.get('/spending-by-category', authenticateToken, async (req, res) => {
         break;
     }
     
+    // Получаем ID счетов пользователя
+    const [userAccounts] = await db.query(
+      'SELECT account_id FROM accounts WHERE user_id = ?',
+      [userId]
+    );
+    const accountIds = userAccounts.map(a => a.account_id);
+    
+    if (accountIds.length === 0) {
+      return res.json({
+        success: true,
+        period: period,
+        categories: [],
+        totalSpent: 0
+      });
+    }
+    
     const [categories] = await db.query(
       `SELECT 
          COALESCE(tc.category_name, 'Без категории') as category,
@@ -117,14 +168,16 @@ router.get('/spending-by-category', authenticateToken, async (req, res) => {
          SUM(t.amount) as total,
          COUNT(t.transaction_id) as count
        FROM transactions t
-       INNER JOIN accounts a ON t.from_account_id = a.account_id
        LEFT JOIN transaction_category_mapping tcm ON t.transaction_id = tcm.transaction_id
        LEFT JOIN transaction_categories tc ON tcm.category_id = tc.category_id
-       WHERE a.user_id = ? AND t.status = 'completed' ${dateCondition}
+       WHERE t.from_account_id IN (?) 
+       AND (t.to_account_id IS NULL OR t.to_account_id NOT IN (?))
+       AND t.status = 'completed' 
+       ${dateCondition}
        GROUP BY tc.category_id, tc.category_name, tc.icon, tc.color
        ORDER BY total DESC
        LIMIT 20`,
-      [userId]
+      [accountIds, accountIds]
     );
     
     const total = categories.reduce((sum, cat) => sum + parseFloat(cat.total), 0);
@@ -160,21 +213,41 @@ router.get('/income-expense-trend', authenticateToken, async (req, res) => {
   const months = parseInt(req.query.months) || 12;
   
   try {
+    // Получаем ID счетов
+    const [userAccounts] = await db.query(
+      'SELECT account_id FROM accounts WHERE user_id = ?',
+      [userId]
+    );
+    const accountIds = userAccounts.map(a => a.account_id);
+    
+    if (accountIds.length === 0) {
+      return res.json({
+        success: true,
+        trend: []
+      });
+    }
+    
     const [trend] = await db.query(
       `SELECT 
          DATE_FORMAT(t.created_at, '%Y-%m') as month,
-         SUM(CASE WHEN t.to_account_id IN (SELECT account_id FROM accounts WHERE user_id = ?) 
-                  THEN t.amount ELSE 0 END) as income,
-         SUM(CASE WHEN t.from_account_id IN (SELECT account_id FROM accounts WHERE user_id = ?) 
-                  THEN t.amount ELSE 0 END) as expense
+         SUM(CASE 
+           WHEN t.to_account_id IN (?) AND 
+                (t.from_account_id IS NULL OR t.from_account_id NOT IN (?))
+           THEN t.amount 
+           ELSE 0 
+         END) as income,
+         SUM(CASE 
+           WHEN t.from_account_id IN (?) AND 
+                (t.to_account_id IS NULL OR t.to_account_id NOT IN (?))
+           THEN t.amount 
+           ELSE 0 
+         END) as expense
        FROM transactions t
-       WHERE (t.from_account_id IN (SELECT account_id FROM accounts WHERE user_id = ?)
-              OR t.to_account_id IN (SELECT account_id FROM accounts WHERE user_id = ?))
-       AND t.status = 'completed'
+       WHERE t.status = 'completed'
        AND t.created_at >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
        GROUP BY month
        ORDER BY month ASC`,
-      [userId, userId, userId, userId, months]
+      [accountIds, accountIds, accountIds, accountIds, months]
     );
     
     res.json({
@@ -337,29 +410,42 @@ router.get('/budgets', authenticateToken, async (req, res) => {
       [userId]
     );
     
+    // Получаем ID счетов
+    const [userAccounts] = await db.query(
+      'SELECT account_id FROM accounts WHERE user_id = ?',
+      [userId]
+    );
+    const accountIds = userAccounts.map(a => a.account_id);
+    
     // Для каждого бюджета вычисляем текущие расходы
     for (let budget of budgets) {
-      const [spending] = await db.query(
-        `SELECT COALESCE(SUM(t.amount), 0) as spent
-         FROM transactions t
-         INNER JOIN accounts a ON t.from_account_id = a.account_id
-         LEFT JOIN transaction_category_mapping tcm ON t.transaction_id = tcm.transaction_id
-         WHERE a.user_id = ?
-         AND t.status = 'completed'
-         AND t.created_at >= ?
-         AND (? IS NULL OR t.created_at <= ?)
-         AND (? IS NULL OR tcm.category_id = ?)`,
-        [
-          userId,
-          budget.start_date,
-          budget.end_date,
-          budget.end_date,
-          budget.category_id,
-          budget.category_id
-        ]
-      );
+      if (accountIds.length > 0) {
+        const [spending] = await db.query(
+          `SELECT COALESCE(SUM(t.amount), 0) as spent
+           FROM transactions t
+           LEFT JOIN transaction_category_mapping tcm ON t.transaction_id = tcm.transaction_id
+           WHERE t.from_account_id IN (?)
+           AND (t.to_account_id IS NULL OR t.to_account_id NOT IN (?))
+           AND t.status = 'completed'
+           AND t.created_at >= ?
+           AND (? IS NULL OR t.created_at <= ?)
+           AND (? IS NULL OR tcm.category_id = ?)`,
+          [
+            accountIds,
+            accountIds,
+            budget.start_date,
+            budget.end_date,
+            budget.end_date,
+            budget.category_id,
+            budget.category_id
+          ]
+        );
+        
+        budget.spent = parseFloat(spending[0].spent || 0);
+      } else {
+        budget.spent = 0;
+      }
       
-      budget.spent = parseFloat(spending[0].spent || 0);
       budget.remaining = parseFloat(budget.budget_amount) - budget.spent;
       budget.percentage = ((budget.spent / parseFloat(budget.budget_amount)) * 100).toFixed(1);
     }
