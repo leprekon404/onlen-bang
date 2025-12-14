@@ -558,14 +558,10 @@ document.getElementById('navCardsBtn')?.addEventListener('click', () => {
     .querySelector('.md-accounts-section')
     ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
+
+// Переход на страницу аналитики при нажатии на кнопку "История"
 document.getElementById('navHistoryBtn')?.addEventListener('click', () => {
-  document
-    .querySelectorAll('.md-bottom-nav > button')
-    .forEach((b) => b.classList.remove('active'));
-  document.getElementById('navHistoryBtn')?.classList.add('active');
-  document
-    .querySelector('.md-tx-section')
-    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  location.href = 'analytics.html';
 });
 
 // ----- старт -----
