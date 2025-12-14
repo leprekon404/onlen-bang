@@ -6,7 +6,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 // вспомогательная функция выдачи токена и объекта пользователя
-function buildAuthResponse(userRow) {
+function buildAuthResponse(userRow, roleRow) {
   const token = jwt.sign(
     { userId: userRow.user_id, username: userRow.username },
     process.env.JWT_SECRET,
@@ -22,6 +22,8 @@ function buildAuthResponse(userRow) {
       email: userRow.email,
       fullName: userRow.full_name,
       phoneNumber: userRow.phone_number,
+      roleId: userRow.role_id,
+      roleName: roleRow ? roleRow.role_name : 'user'
     },
   };
 }
@@ -38,7 +40,10 @@ router.post('/login', async (req, res) => {
     }
 
     const [rows] = await db.query(
-      'SELECT * FROM users WHERE username = ?',
+      `SELECT u.*, r.role_name 
+       FROM users u 
+       LEFT JOIN roles r ON u.role_id = r.role_id 
+       WHERE u.username = ?`,
       [username]
     );
 
@@ -63,7 +68,7 @@ router.post('/login', async (req, res) => {
       [user.user_id]
     );
 
-    res.json(buildAuthResponse(user));
+    res.json(buildAuthResponse(user, { role_name: user.role_name }));
   } catch (e) {
     console.error('Login error:', e);
     res
@@ -105,19 +110,23 @@ router.post('/register', async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password, 12);
 
+    // По умолчанию новый пользователь получает role_id = 1 (user)
     const [result] = await db.query(
-      'INSERT INTO users (username, email, password_hash, full_name, phone_number, is_active, created_at) ' +
-      'VALUES (?, ?, ?, ?, ?, TRUE, NOW())',
+      'INSERT INTO users (username, email, password_hash, full_name, phone_number, is_active, role_id, created_at) ' +
+      'VALUES (?, ?, ?, ?, ?, TRUE, 1, NOW())',
       [username, email, passwordHash, fullName || null, phoneNumber || null]
     );
 
     const [rows] = await db.query(
-      'SELECT * FROM users WHERE user_id = ?',
+      `SELECT u.*, r.role_name 
+       FROM users u 
+       LEFT JOIN roles r ON u.role_id = r.role_id 
+       WHERE u.user_id = ?`,
       [result.insertId]
     );
     const newUser = rows[0];
 
-    res.status(201).json(buildAuthResponse(newUser));
+    res.status(201).json(buildAuthResponse(newUser, { role_name: newUser.role_name }));
   } catch (e) {
     console.error('Register error:', e);
     res
