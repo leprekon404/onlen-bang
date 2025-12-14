@@ -2,10 +2,10 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
-const { authenticate } = require('../middleware/auth');
+const authenticateToken = require('../middleware/auth');
 
 // POST /api/transactions/transfer – общий перевод (как было)
-router.post('/transfer', authenticate, async (req, res) => {
+router.post('/transfer', authenticateToken, async (req, res) => {
   const conn = await db.getConnection();
   try {
     const { fromAccountId, toAccountId, amount, description } = req.body;
@@ -22,7 +22,7 @@ router.post('/transfer', authenticate, async (req, res) => {
 
     const [fromRows] = await conn.query(
       'SELECT * FROM accounts WHERE account_id = ? AND user_id = ? FOR UPDATE',
-      [fromAccountId, req.user.id]
+      [fromAccountId, req.user.userId]
     );
     if (!fromRows.length) {
       await conn.rollback();
@@ -84,7 +84,7 @@ router.post('/transfer', authenticate, async (req, res) => {
 });
 
 // POST /api/transactions/transfer-self – между своими счетами
-router.post('/transfer-self', authenticate, async (req, res) => {
+router.post('/transfer-self', authenticateToken, async (req, res) => {
   const conn = await db.getConnection();
   try {
     const { fromAccountId, toAccountId, amount, description } = req.body;
@@ -107,11 +107,11 @@ router.post('/transfer-self', authenticate, async (req, res) => {
 
     const [fromRows] = await conn.query(
       'SELECT * FROM accounts WHERE account_id = ? AND user_id = ? FOR UPDATE',
-      [fromAccountId, req.user.id]
+      [fromAccountId, req.user.userId]
     );
     const [toRows] = await conn.query(
       'SELECT * FROM accounts WHERE account_id = ? AND user_id = ? FOR UPDATE',
-      [toAccountId, req.user.id]
+      [toAccountId, req.user.userId]
     );
 
     if (!fromRows.length || !toRows.length) {
@@ -163,7 +163,7 @@ router.post('/transfer-self', authenticate, async (req, res) => {
 });
 
 // GET /api/transactions/history – общая история по всем счетам пользователя
-router.get('/history', authenticate, async (req, res) => {
+router.get('/history', authenticateToken, async (req, res) => {
   try {
     const [rows] = await db.query(
       `SELECT t.*,
@@ -175,7 +175,7 @@ router.get('/history', authenticate, async (req, res) => {
        WHERE fa.user_id = ? OR ta.user_id = ?
        ORDER BY t.created_at DESC
        LIMIT 100`,
-      [req.user.id, req.user.id]
+      [req.user.userId, req.user.userId]
     );
     res.json({ success: true, transactions: rows });
   } catch (e) {
@@ -185,13 +185,13 @@ router.get('/history', authenticate, async (req, res) => {
 });
 
 // GET /api/transactions/by-account/:id – история по конкретному счёту
-router.get('/by-account/:id', authenticate, async (req, res) => {
+router.get('/by-account/:id', authenticateToken, async (req, res) => {
   try {
     const accountId = Number(req.params.id);
 
     const [accRows] = await db.query(
       'SELECT account_id FROM accounts WHERE account_id = ? AND user_id = ?',
-      [accountId, req.user.id]
+      [accountId, req.user.userId]
     );
     if (!accRows.length) {
       return res.status(404).json({ success: false, message: 'Счёт не найден' });
