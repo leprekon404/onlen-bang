@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Аналитика - Online Banking</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="dashboard-header">
+            <h1>📊 Аналитика и отчеты</h1>
+            <div class="header-actions">
+                <select id="periodFilter" class="period-filter">
+                    <option value="month">Текущий месяц</option>
+                    <option value="week">Эта неделя</option>
+                    <option value="day">Сегодня</option>
+                    <option value="year">Текущий год</option>
+                    <option value="all">Все время</option>
+                </select>
+                <button onclick="location.href='dashboard.html'" class="btn-secondary">Назад</button>
+                <button onclick="logout()" class="btn-logout">Выйти</button>
+            </div>
+        </header>
+
+        <!-- Общая сводка -->
+        <section class="summary-cards">
+            <div class="card summary-card">
+                <div class="card-icon balance">💰</div>
+                <div class="card-content">
+                    <div class="card-label">Текущий баланс</div>
+                    <div class="card-value" id="totalBalance">0 ₽</div>
+                </div>
+            </div>
+            
+            <div class="card summary-card">
+                <div class="card-icon income">📈</div>
+                <div class="card-content">
+                    <div class="card-label">Доходы</div>
+                    <div class="card-value" id="totalIncome">0 ₽</div>
+                </div>
+            </div>
+            
+            <div class="card summary-card">
+                <div class="card-icon expense">📉</div>
+                <div class="card-content">
+                    <div class="card-label">Расходы</div>
+                    <div class="card-value" id="totalExpense">0 ₽</div>
+                </div>
+            </div>
+            
+            <div class="card summary-card">
+                <div class="card-icon savings">💎</div>
+                <div class="card-content">
+                    <div class="card-label">Чистые сбережения</div>
+                    <div class="card-value" id="netSavings">0 ₽</div>
+                    <div class="card-subtitle" id="savingsRate">0%</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Графики -->
+        <div class="charts-container">
+            <div class="card chart-card">
+                <h3>📈 Доходы и расходы по месяцам</h3>
+                <canvas id="incomExpenseTrendChart"></canvas>
+            </div>
+            
+            <div class="card chart-card">
+                <h3>🧩 Расходы по категориям</h3>
+                <canvas id="categoryPieChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Расходы по категориям списком -->
+        <section class="card">
+            <h3>📊 Детальные расходы</h3>
+            <div id="categoryBreakdown" class="category-breakdown"></div>
+        </section>
+
+        <!-- Бюджеты -->
+        <section class="card">
+            <div class="section-header">
+                <h3>🎯 Бюджеты</h3>
+                <button onclick="showCreateBudgetModal()" class="btn-primary">Создать бюджет</button>
+            </div>
+            <div id="budgetsList" class="budgets-list"></div>
+        </section>
+
+        <!-- Финансовые цели -->
+        <section class="card">
+            <div class="section-header">
+                <h3>⭐ Финансовые цели</h3>
+                <button onclick="showCreateGoalModal()" class="btn-primary">Добавить цель</button>
+            </div>
+            <div id="goalsList" class="goals-list"></div>
+        </section>
+    </div>
+
+    <!-- Модальное окно создания бюджета -->
+    <div id="budgetModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" onclick="closeBudgetModal()">&times;</span>
+            <h2>Создать бюджет</h2>
+            <form id="budgetForm">
+                <input type="text" id="budgetName" placeholder="Название бюджета" required>
+                <input type="number" id="budgetAmount" placeholder="Сумма" step="0.01" required>
+                <select id="budgetCategory">
+                    <option value="">Все категории</option>
+                </select>
+                <select id="budgetPeriod" required>
+                    <option value="daily">Ежедневно</option>
+                    <option value="weekly">Еженедельно</option>
+                    <option value="monthly" selected>Ежемесячно</option>
+                    <option value="yearly">Ежегодно</option>
+                </select>
+                <input type="date" id="budgetStartDate" required>
+                <input type="number" id="alertThreshold" placeholder="Порог предупреждения (%)" min="0" max="100">
+                <button type="submit" class="btn-primary">Создать</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модальное окно создания цели -->
+    <div id="goalModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" onclick="closeGoalModal()">&times;</span>
+            <h2>Добавить цель</h2>
+            <form id="goalForm">
+                <input type="text" id="goalName" placeholder="Название цели" required>
+                <textarea id="goalDescription" placeholder="Описание" rows="3"></textarea>
+                <input type="number" id="goalAmount" placeholder="Целевая сумма" step="0.01" required>
+                <input type="date" id="goalDate" placeholder="Срок достижения">
+                <select id="goalPriority">
+                    <option value="low">Низкий приоритет</option>
+                    <option value="medium" selected>Средний приоритет</option>
+                    <option value="high">Высокий приоритет</option>
+                </select>
+                <button type="submit" class="btn-primary">Добавить</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/analytics.js"></script>
+</body>
+</html>
