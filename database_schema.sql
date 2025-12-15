@@ -1,36 +1,37 @@
 -- ============================================
 -- database_schema_full.sql для online-banking-simple
--- (объединённый: исходная схема + новые поля accounts)
+-- (PostgreSQL версия)
 -- ============================================
 
 -- 1. БАЗА ДАННЫХ
 
-CREATE DATABASE IF NOT EXISTS online_banking_db
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
-USE online_banking_db;
+CREATE DATABASE online_banking_db
+  WITH ENCODING='UTF8'
+       LC_COLLATE='ru_RU.UTF-8'
+       LC_CTYPE='ru_RU.UTF-8'
+       TEMPLATE=template0;
+
+\c online_banking_db;
 
 -- 2. ПОЛЬЗОВАТЕЛЬ ДЛЯ ПРИЛОЖЕНИЯ
 
-DROP USER IF EXISTS 'banking_app_user'@'localhost';
-CREATE USER 'banking_app_user'@'localhost'
-  IDENTIFIED BY 'SecureP@ssw0rd2025!';
-GRANT ALL PRIVILEGES ON online_banking_db.* TO 'banking_app_user'@'localhost';
-FLUSH PRIVILEGES;
+DROP USER IF EXISTS banking_app_user;
+CREATE USER banking_app_user WITH PASSWORD 'SecureP@ssw0rd2025!';
+GRANT ALL PRIVILEGES ON DATABASE online_banking_db TO banking_app_user;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO banking_app_user;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO banking_app_user;
 
 -- 3. ОЧИСТКА ТАБЛИЦ (можно запускать скрипт повторно)
 
-SET FOREIGN_KEY_CHECKS = 0;
-DROP TABLE IF EXISTS biometric_credentials;
-DROP TABLE IF EXISTS transactions;
-DROP TABLE IF EXISTS accounts;
-DROP TABLE IF EXISTS users;
-SET FOREIGN_KEY_CHECKS = 1;
+DROP TABLE IF EXISTS biometric_credentials CASCADE;
+DROP TABLE IF EXISTS transactions CASCADE;
+DROP TABLE IF EXISTS accounts CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
 
 -- 4. ТАБЛИЦА ПОЛЬЗОВАТЕЛЕЙ
 
 CREATE TABLE users (
-  user_id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGSERIAL PRIMARY KEY,
   username VARCHAR(50) NOT NULL UNIQUE,
   email VARCHAR(100) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
@@ -38,52 +39,58 @@ CREATE TABLE users (
   phone_number VARCHAR(20),
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   is_locked BOOLEAN NOT NULL DEFAULT FALSE,
-  failed_login_attempts INT NOT NULL DEFAULT 0,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  last_login DATETIME,
-  INDEX idx_username (username),
-  INDEX idx_email (email)
-) ENGINE=InnoDB;
+  failed_login_attempts INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_login TIMESTAMP
+);
+
+CREATE INDEX idx_username ON users(username);
+CREATE INDEX idx_email ON users(email);
 
 -- 5. ТАБЛИЦА СЧЕТОВ / КАРТ
 
 CREATE TABLE accounts (
-  account_id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  account_id BIGSERIAL PRIMARY KEY,
   user_id BIGINT NOT NULL,
   account_number VARCHAR(20) NOT NULL UNIQUE,
-  account_type ENUM('debit','credit','savings') NOT NULL DEFAULT 'debit',
+  account_type VARCHAR(20) NOT NULL DEFAULT 'debit' CHECK (account_type IN ('debit', 'credit', 'savings')),
   balance DECIMAL(15,2) NOT NULL DEFAULT 0.00,
   currency VARCHAR(3) NOT NULL DEFAULT 'RUB',
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  daily_limit DECIMAL(15,2),
+  is_frozen BOOLEAN NOT NULL DEFAULT FALSE,
+  pin_hash VARCHAR(255),
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_accounts_user
     FOREIGN KEY (user_id) REFERENCES users(user_id)
-    ON DELETE CASCADE,
-  INDEX idx_user_id (user_id),
-  INDEX idx_account_number (account_number)
-) ENGINE=InnoDB;
+    ON DELETE CASCADE
+);
+
+CREATE INDEX idx_user_id ON accounts(user_id);
+CREATE INDEX idx_account_number ON accounts(account_number);
 
 -- 6. ТАБЛИЦА ТРАНЗАКЦИЙ
 
 CREATE TABLE transactions (
-  transaction_id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  transaction_id BIGSERIAL PRIMARY KEY,
   from_account_id BIGINT,
   to_account_id BIGINT,
   amount DECIMAL(15,2) NOT NULL,
-  transaction_type VARCHAR(50) NOT NULL, -- transfer, deposit, withdraw
+  transaction_type VARCHAR(50) NOT NULL,
   description VARCHAR(255),
-  status ENUM('pending','completed','failed') NOT NULL DEFAULT 'completed',
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  status VARCHAR(20) NOT NULL DEFAULT 'completed' CHECK (status IN ('pending', 'completed', 'failed')),
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_tx_from
     FOREIGN KEY (from_account_id) REFERENCES accounts(account_id)
     ON DELETE SET NULL,
   CONSTRAINT fk_tx_to
     FOREIGN KEY (to_account_id) REFERENCES accounts(account_id)
-    ON DELETE SET NULL,
-  INDEX idx_from_account (from_account_id),
-  INDEX idx_to_account (to_account_id),
-  INDEX idx_created_at (created_at)
-) ENGINE=InnoDB;
+    ON DELETE SET NULL
+);
+
+CREATE INDEX idx_from_account ON transactions(from_account_id);
+CREATE INDEX idx_to_account ON transactions(to_account_id);
+CREATE INDEX idx_created_at ON transactions(created_at);
 
 -- 7. ТАБЛИЦА БИОМЕТРИИ (на будущее)
 
@@ -91,15 +98,16 @@ CREATE TABLE biometric_credentials (
   credential_id VARCHAR(255) PRIMARY KEY,
   user_id BIGINT NOT NULL,
   public_key TEXT,
-  counter INT NOT NULL DEFAULT 0,
+  counter INTEGER NOT NULL DEFAULT 0,
   device_name VARCHAR(100),
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  last_used DATETIME,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_used TIMESTAMP,
   CONSTRAINT fk_bio_user
     FOREIGN KEY (user_id) REFERENCES users(user_id)
-    ON DELETE CASCADE,
-  INDEX idx_bio_user (user_id)
-) ENGINE=InnoDB;
+    ON DELETE CASCADE
+);
+
+CREATE INDEX idx_bio_user ON biometric_credentials(user_id);
 
 -- 8. ТЕСТОВЫЕ ПОЛЬЗОВАТЕЛИ
 -- Пароль: Password123! (bcrypt-хеш уже готов)
@@ -119,10 +127,10 @@ INSERT INTO users (username, email, password_hash, full_name, phone_number) VALU
 -- У Петрова (user_id = 2) сразу две карты.
 
 INSERT INTO accounts (user_id, account_number, account_type, balance, currency) VALUES
-  (1, '4276123456789012', 'debit',   150000.00, 'RUB'),  -- Иванов
-  (2, '4276555512349876', 'debit',    75000.00, 'RUB'),  -- Петров, карта 1
-  (2, '4276555598765432', 'savings',  25000.00, 'RUB'),  -- Петров, карта 2
-  (3, '4276444498761234', 'debit',    25000.00, 'RUB');  -- Сидоров
+  (1, '4276123456789012', 'debit',   150000.00, 'RUB'),
+  (2, '4276555512349876', 'debit',    75000.00, 'RUB'),
+  (2, '4276555598765432', 'savings',  25000.00, 'RUB'),
+  (3, '4276444498761234', 'debit',    25000.00, 'RUB');
 
 -- 10. ТЕСТОВЫЕ ТРАНЗАКЦИИ
 -- Примеры переводов между картами Петрова.
@@ -133,20 +141,21 @@ INSERT INTO transactions (from_account_id, to_account_id, amount, transaction_ty
 
 -- 11. ПРОВЕРКА
 
-SELECT '✅ online_banking_db создана' AS status;
+DO $$
+BEGIN
+  RAISE NOTICE '✅ online_banking_db создана';
+END $$;
+
 SELECT COUNT(*) AS users_count FROM users;
 SELECT COUNT(*) AS accounts_count FROM accounts;
 SELECT COUNT(*) AS tx_count FROM transactions;
 
--- Обновлённый пароль только для petrov (если хочешь отличать от остальных)
+-- Обновлённый пароль только для petrov
 
 UPDATE users
 SET password_hash = '$2a$12$GyOhDSSummiqMgt8fcTJaOE615OvmwmKgJ59bg2D0nGu1FRxIR3/e'
 WHERE username = 'petrov';
 
--- 12. РАСШИРЕНИЕ ТАБЛИЦЫ accounts (лимиты, блокировка, PIN)
-
-ALTER TABLE accounts
-  ADD COLUMN daily_limit DECIMAL(15,2) NULL AFTER balance,
-  ADD COLUMN is_frozen   BOOLEAN NOT NULL DEFAULT FALSE AFTER is_active,
-  ADD COLUMN pin_hash    VARCHAR(255) NULL AFTER is_frozen;
+-- Права для banking_app_user на новые таблицы
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO banking_app_user;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO banking_app_user;
