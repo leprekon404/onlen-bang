@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../config/database');
 const authenticateToken = require('../middleware/auth');
 const { requireAdmin, requireManager } = require('../middleware/adminAuth');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs'); // Изменено с bcrypt на bcryptjs
 
 // ============================================
 // АДМИН-ПАНЕЛЬ API
