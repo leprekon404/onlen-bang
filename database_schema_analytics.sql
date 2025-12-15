@@ -1,9 +1,8 @@
 -- ============================================
 -- МОДУЛЬ АНАЛИТИКИ И ПЛАНИРОВАНИЯ БЮДЖЕТА
 -- (PostgreSQL версия)
+-- Выполнять после database_schema.sql
 -- ============================================
-
-\c online_banking_db;
 
 -- Категории транзакций
 CREATE TABLE IF NOT EXISTS transaction_categories (

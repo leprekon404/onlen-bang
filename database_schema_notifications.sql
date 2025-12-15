@@ -1,9 +1,8 @@
 -- ============================================
 -- МОДУЛЬ УВЕДОМЛЕНИЙ
 -- (PostgreSQL версия)
+-- Выполнять после database_schema.sql
 -- ============================================
-
-\c online_banking_db;
 
 -- Типы уведомлений
 CREATE TABLE IF NOT EXISTS notification_types (

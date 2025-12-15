@@ -1,25 +1,8 @@
 -- ============================================
--- database_schema_full.sql для online-banking-simple
--- (PostgreSQL версия)
+-- database_schema.sql для online-banking-simple
+-- (PostgreSQL версия - основные таблицы)
+-- Выполнять после подключения к БД: \c online_banking_db
 -- ============================================
-
--- 1. БАЗА ДАННЫХ
-
-CREATE DATABASE online_banking_db
-  WITH ENCODING='UTF8'
-       LC_COLLATE='ru_RU.UTF-8'
-       LC_CTYPE='ru_RU.UTF-8'
-       TEMPLATE=template0;
-
-\c online_banking_db;
-
--- 2. ПОЛЬЗОВАТЕЛЬ ДЛЯ ПРИЛОЖЕНИЯ
-
-DROP USER IF EXISTS banking_app_user;
-CREATE USER banking_app_user WITH PASSWORD 'SecureP@ssw0rd2025!';
-GRANT ALL PRIVILEGES ON DATABASE online_banking_db TO banking_app_user;
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO banking_app_user;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO banking_app_user;
 
 -- 3. ОЧИСТКА ТАБЛИЦ (можно запускать скрипт повторно)
 
@@ -143,7 +126,7 @@ INSERT INTO transactions (from_account_id, to_account_id, amount, transaction_ty
 
 DO $$
 BEGIN
-  RAISE NOTICE '✅ online_banking_db создана';
+  RAISE NOTICE '✅ Основные таблицы созданы';
 END $$;
 
 SELECT COUNT(*) AS users_count FROM users;
