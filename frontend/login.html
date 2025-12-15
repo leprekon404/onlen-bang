@@ -44,8 +44,8 @@
       border-radius: 32px;
       background: var(--card-bg);
       padding: 20px 20px 28px;
-      display: flex;              /* основной layout */
-      flex-direction: column;     /* сверху вниз */
+      display: flex;
+      flex-direction: column;
     }
 
     .welcome-top-row {
@@ -84,7 +84,6 @@
       max-width: 260px;
     }
 
-    /* тут как раз «отступ после верхнего текста» */
     .welcome-actions {
       margin-top: 220px;
       margin-bottom: 4px;
@@ -93,8 +92,6 @@
       gap: 12px;
     }
 
-    /* если экран высокий – прижимаем блок с кнопками вниз,
-       но без абсолютного позиционирования */
     .welcome-inner-spacer {
       flex: 1;
     }
@@ -218,6 +215,38 @@
       margin-top: 4px;
     }
 
+    /* Поле с кнопкой показа пароля */
+    .password-wrapper {
+      position: relative;
+    }
+
+    .password-toggle {
+      position: absolute;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-size: 1.2rem;
+      color: var(--text-muted);
+      padding: 0;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.2s;
+    }
+
+    .password-toggle:hover {
+      color: var(--text-main);
+    }
+
+    .password-wrapper .form-control {
+      padding-right: 48px;
+    }
+
     @media (max-width: 480px) {
       .welcome-shell {
         margin: 20px auto;
@@ -281,8 +310,13 @@
         </div>
         <div class="mb-1">
           <label class="form-label">Пароль</label>
-          <input id="loginPassword" type="password" class="form-control"
-                 autocomplete="current-password" required>
+          <div class="password-wrapper">
+            <input id="loginPassword" type="password" class="form-control"
+                   autocomplete="current-password" required>
+            <button type="button" class="password-toggle" onclick="togglePassword('loginPassword')">
+              👁️
+            </button>
+          </div>
         </div>
         <div id="loginError" class="error-text"></div>
         <button class="btn btn-primary w-100 mt-2" type="submit">Войти</button>
@@ -317,15 +351,25 @@
         </div>
         <div class="mb-2">
           <label class="form-label">Телефон</label>
-          <input id="regPhone" class="form-control" placeholder="+7 900 000‑00‑00">
+          <input id="regPhone" class="form-control" placeholder="+7 900 000‑ 00‑00">
         </div>
         <div class="mb-2">
           <label class="form-label">Пароль</label>
-          <input id="regPassword" type="password" class="form-control" required>
+          <div class="password-wrapper">
+            <input id="regPassword" type="password" class="form-control" required>
+            <button type="button" class="password-toggle" onclick="togglePassword('regPassword')">
+              👁️
+            </button>
+          </div>
         </div>
         <div class="mb-1">
           <label class="form-label">Повторите пароль</label>
-          <input id="regPassword2" type="password" class="form-control" required>
+          <div class="password-wrapper">
+            <input id="regPassword2" type="password" class="form-control" required>
+            <button type="button" class="password-toggle" onclick="togglePassword('regPassword2')">
+              👁️
+            </button>
+          </div>
         </div>
         <div id="registerError" class="error-text"></div>
         <button class="btn btn-primary w-100 mt-2" type="submit">Зарегистрироваться</button>
@@ -369,6 +413,20 @@
       }
     });
   });
+
+  // Функция показа/скрытия пароля
+  function togglePassword(inputId) {
+    const input = document.getElementById(inputId);
+    const button = input.nextElementSibling;
+    
+    if (input.type === 'password') {
+      input.type = 'text';
+      button.textContent = '🙈'; // Обезьянка закрыла глаза
+    } else {
+      input.type = 'password';
+      button.textContent = '👁️'; // Глаз
+    }
+  }
 
   document.getElementById('loginForm').addEventListener('submit', async e => {
     e.preventDefault();
