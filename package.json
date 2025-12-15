@@ -1,21 +1,44 @@
 {
   "name": "online-banking-simple",
-  "version": "1.0.0",
-  "description": "Простая система онлайн-банка на Node.js + MySQL",
+  "version": "2.0.0",
+  "description": "Простая система онлайн-банка на Node.js + PostgreSQL",
   "main": "backend/server.js",
   "scripts": {
     "start": "node backend/server.js",
-    "dev": "nodemon backend/server.js"
+    "dev": "nodemon backend/server.js",
+    "backend": "cd backend && npm start",
+    "backend:dev": "cd backend && npm run dev",
+    "db:init": "psql -U postgres -f database_schema_init.sql",
+    "db:schema": "psql -U postgres -d online_banking_db -f database_schema.sql",
+    "db:analytics": "psql -U postgres -d online_banking_db -f database_schema_analytics.sql",
+    "db:notifications": "psql -U postgres -d online_banking_db -f database_schema_notifications.sql",
+    "db:payments": "psql -U postgres -d online_banking_db -f database_schema_payments.sql",
+    "db:setup": "npm run db:init && npm run db:schema && npm run db:analytics && npm run db:notifications && npm run db:payments",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "keywords": [
+    "banking",
+    "nodejs",
+    "postgresql",
+    "express"
+  ],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
-    "mysql2": "^3.6.5"
+    "pg": "^8.11.3",
+    "uuid": "^9.0.1",
+    "node-cron": "^3.0.3"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
   }
 }
